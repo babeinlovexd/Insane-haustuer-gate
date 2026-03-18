@@ -5,7 +5,10 @@ esphome:
   on_boot:
     priority: -10
     then:
-      - script.execute: led_idle
+      - script.execute: led_party
+      - output.set_level:
+          id: blue_led_output
+          level: 100%
 
 esp32:
   board: esp32dev
@@ -52,8 +55,8 @@ wifi:
   ssid: !secret wifi_ssid
   password: !secret wifi_password
   ap:
-    ssid: "Hautur-Gate Fallback Hotspot"
-    password: !secret wifi_ap_password
+    ssid: "Haustur-Gate Fallback"
+    password: !secret ap_password
 
 logger:
 captive_portal:
@@ -203,36 +206,28 @@ binary_sensor:
     id: door_contact
     device_class: door
 
+  # --- Türklingel (Button 1) ---
   - platform: gpio
     pin:
       number: GPIO14
       mode: INPUT_PULLUP
-      inverted: true
-    name: "Haustür Button Sensor"
-    id: haustur_button_sensor
+      inverted: true # Taster schaltet gegen GND -> Inverted = ON wenn gedrückt
+    name: "Türklingel"
+    id: doorbell_sensor
     filters:
-      - delayed_on: 10ms
-      - delayed_off: 10ms
+      - delayed_on: 50ms # Kurzes Entprellen
     on_press:
       then:
-        - button.press: haustur_button
+        - logger.log: "Klingel gedrückt!"
+        - button.press: trigger_doorbell
 
-  - platform: gpio
-    pin:
-      number: GPIO27
-      mode: INPUT_PULLUP
-      inverted: true
-    name: "Haustür Button 2 Sensor"
-    id: haustur_button_2_sensor
-    on_press:
-      then:
-        - button.press: haustur_button_2
 
 # --- TEXT INPUT ---
 text:
   - platform: template
     name: "Name für neuen Zugang"
     id: input_new_name
+    mode: text
     optimistic: true
     min_length: 0
     max_length: 32
@@ -416,11 +411,47 @@ output:
     id: buzzer_output
     inverted: true
 
+  - platform: ledc
+    pin: GPIO27
+    id: blue_led_output
+    frequency: 1000Hz
+
+light:
+  - platform: monochromatic
+    name: "Gehäuse LED Helligkeit"
+    id: blue_led_dimmer
+    output: blue_led_output
+    icon: "mdi:brightness-6"
+    default_transition_length: 500ms # Sanftes Ein-/Ausblenden
+    restore_mode: ALWAYS_ON # Startet nach dem Booten direkt
+
 # --- SKRIPTE ---
 script:
+  # --- Klingel Effekt (Blaues Atmen) ---
+  - id: led_doorbell_effect
+    then:
+      - fingerprint_grow.aura_led_control:
+          state: BREATHING
+          speed: 150
+          color: BLUE
+          count: 3
+      - delay: 3s
+      - script.execute: led_idle
+
   - id: beep_success
     mode: restart
     then:
+      - output.turn_on: buzzer_output
+      - delay: 150ms
+      - output.turn_off: buzzer_output
+
+  - id: beep_done
+    mode: restart
+    then:
+      - output.turn_on: buzzer_output
+      - delay: 150ms
+      - output.turn_off: buzzer_output
+      - delay: 150ms
       - output.turn_on: buzzer_output
       - delay: 150ms
       - output.turn_off: buzzer_output
@@ -447,11 +478,23 @@ script:
 
   - id: led_idle
     then:
-      - fingerprint_grow.aura_led_control:
-          state: ALWAYS_ON
-          speed: 0
-          color: BLUE
-          count: 0
+      - if:
+          condition:
+            switch.is_on: standby_led_switch
+          then:
+            # Schalter ist AN -> Blaues Licht
+            - fingerprint_grow.aura_led_control:
+                state: ALWAYS_ON
+                speed: 0
+                color: BLUE
+                count: 0
+          else:
+            # Schalter ist AUS -> Licht komplett aus
+            - fingerprint_grow.aura_led_control:
+                state: ALWAYS_OFF
+                speed: 0
+                color: BLUE
+                count: 0
 
   - id: led_success
     then:
@@ -473,6 +516,34 @@ script:
       - delay: 2s
       - script.execute: led_idle
 
+  - id: led_warning
+    then:
+      - fingerprint_grow.aura_led_control: {state: ALWAYS_ON, color: YELLOW, speed: 0, count: 1}
+      - delay: 2s
+      - script.execute: led_idle
+
+  - id: led_setup
+    then:
+      - fingerprint_grow.aura_led_control: {state: BREATHING, speed: 60, color: PURPLE, count: 0}
+
+  - id: led_party
+    then:
+      - fingerprint_grow.aura_led_control: {state: FLASHING, speed: 50, color: RED, count: 1}
+      - delay: 150ms
+      - fingerprint_grow.aura_led_control: {state: FLASHING, speed: 50, color: GREEN, count: 1}
+      - delay: 150ms
+      - fingerprint_grow.aura_led_control: {state: FLASHING, speed: 50, color: BLUE, count: 1}
+      - delay: 150ms
+      - fingerprint_grow.aura_led_control: {state: FLASHING, speed: 50, color: PURPLE, count: 1}
+      - delay: 150ms
+      - fingerprint_grow.aura_led_control: {state: FLASHING, speed: 50, color: CYAN, count: 1}
+      - delay: 150ms
+      - fingerprint_grow.aura_led_control: {state: FLASHING, speed: 50, color: YELLOW, count: 1}
+      - delay: 150ms
+      - fingerprint_grow.aura_led_control: {state: FLASHING, speed: 50, color: WHITE, count: 1}
+      - delay: 500ms
+      - script.execute: led_idle
+
 # --- BEDIENELEMENTE ---
 switch:
   - platform: output
@@ -480,6 +551,17 @@ switch:
     output: buzzer_output
     id: door_buzzer
     icon: "mdi:bullhorn"
+
+  - platform: template
+    name: "Standby LED"
+    id: standby_led_switch
+    icon: "mdi:led-on"
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_ON
+    on_turn_on:
+      - script.execute: led_idle
+    on_turn_off:
+      - script.execute: led_idle
 
 button:
   - platform: template
@@ -520,20 +602,13 @@ button:
             - lambda: 'id(finger_status).publish_state("Sensor lädt noch oder Speicher voll...");'
 
   - platform: template
-    name: "Haustür Button"
-    id: haustur_button
-    icon: "mdi:gesture-tap-button"
+    name: "Türklingel"
+    id: trigger_doorbell
+    icon: "mdi:bell-ring"
     on_press:
       then:
-        - script.execute: beep_success
-
-  - platform: template
-    name: "Haustür Button 2"
-    id: haustur_button_2
-    icon: "mdi:gesture-tap-button"
-    on_press:
-      then:
-        - script.execute: beep_success
+        - script.execute: led_doorbell_effect
+        - logger.log: "Türklingel ausgelöst"
 # --- SYSTEM-ÜBERWACHUNG ---
 interval:
   - interval: 4s
