@@ -119,6 +119,9 @@
     <b>NFC-Management:</b> Unterstützt das Hinzufügen von UIDs über einen Lernmodus, der entweder per Software-Button oder durch ein dediziertes Master-Tag aktiviert wird.
   </li>
   <li>
+    <b>Dynamische Namensspeicherung:</b> Über das Textfeld "Name für neuen Zugang" in Home Assistant kann der Name einer Person eingetippt werden. Drückt man anschließend auf "Anlernen" oder legt im NFC-Lernmodus ein Tag auf, wird der Name lokal auf dem Gate gespeichert und mit dem Tag/Fingerabdruck verknüpft. Sobald die Person später die Tür öffnet, wird der Name im Sensor "Letzter Zugang" angezeigt. Das Textfeld leert sich nach dem Speichern automatisch.
+  </li>
+  <li>
     <b>Benutzer-Interaktion:</b> Zwei programmierbare Buttons (Haustür Button 1 & 2) können für beliebige HA-Aktionen wie Klingelfunktionen oder Lichtsteuerung genutzt werden.
   </li>
   <li>
