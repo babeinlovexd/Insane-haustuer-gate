@@ -7,89 +7,138 @@
 
 ## 📋 Projektbeschreibung
 
-Das **Haustür Gate** ist eine maßgeschneiderte Sicherheitslösung für moderne Smart Homes, die eine zuverlässige Brücke zwischen physischer Sicherheit und digitaler Steuerung schlägt.
-Das System ermöglicht den schlüssellosen Zugang mittels Fingerabdruck oder NFC-Chips und ist nativ in Home Assistant eingebunden, um maximale Flexibilität bei Automationen zu bieten.
+Das **Haustür Gate** ist eine vollumfängliche, smarte Zutrittslösung für Home Assistant. Es kombiniert einen biometrischen Fingerabdrucksensor (R503) mit einem NFC-Lesegerät (PN532), um eine sichere, schlüssellose Türöffnung zu ermöglichen. Die Architektur ist für maximale Sicherheit und Zuverlässigkeit ausgelegt.
 
-Ein zentraler Aspekt des Designs ist die **physische Trennung von Logik und Interaktion**:
-Während die Außeneinheit lediglich als Terminal für Sensoren und Taster dient, verbleiben alle sicherheitsrelevanten Komponenten – einschließlich der Stromversorgung und des ESP32-Controllers – geschützt in der Inneneinheit.
-Diese Architektur verhindert effektiv Manipulationsversuche von außen und gewährleistet durch die Verbindung via RJ45-Patchkabel eine stabile Signalübertragung über längere Distanzen.
-
----
-
-## 🏗️ Systemarchitektur
-
-Das System basiert auf einer Split-Hardware-Architektur, um Funktionalität und Sicherheit im Außenbereich zu gewährleisten:
-
-* 🏠 **Inneneinheit:** Fungiert als Steuerzentrale mit einem ESP32 DevKit, dem AC-DC Wandler (HLK-5M05) und dem Logikpegelwandler.
-  Für zukünftige Erweiterungen ist eine **Stiftleiste für Upgrades** integriert, die den einfachen Anschluss von I2C-Komponenten wie OLED-Displays ermöglicht.
-* 🚪 **Außeneinheit:** Dient als Benutzerschnittstelle und beherbergt den biometrischen R503 Sensor, das PN532 NFC-Modul sowie Umwelt- und Interaktionselemente.
-* 🔌 **Konnektivität:** Beide Einheiten sind über **zwei Standard-RJ45-Patchkabel** miteinander verbunden, was eine einfache Installation und Wartung ermöglicht.
+**Kernmerkmale des Systems:**
+*   **Autonome Funktionalität:** Der ESP32 verwaltet Zugangsdaten (NFC-Whitelist und Fingerabdruck-IDs) lokal in seinem Flash-Speicher (via ESPHome `restore_value: yes`). Selbst bei einem Ausfall des WLANs oder von Home Assistant bleibt die Türöffnungsfunktion erhalten!
+*   **Physische Sicherheit (Split-Design):** Das System ist in zwei Einheiten aufgeteilt. Die sicherheitsrelevante Logik (ESP32, Stromversorgung, Relais/Türöffner-Ansteuerung) befindet sich in einer **geschützten Inneneinheit**. Die **Außeneinheit** dient nur als Schnittstelle (Sensoren, Taster, LEDs).
+*   **Datenschutz & Komfort:** Namen von Benutzern können direkt über Home Assistant beim Anlernen eingegeben werden. Das System speichert diese Zuordnung (UID/Finger-ID zu Name) lokal und meldet bei Zutritt den Namen des Benutzers an Home Assistant zurück ("Letzter Zugang").
 
 ---
 
-## 🛠️ Stückliste (Bill of Materials)
+## 🏗️ Systemarchitektur & Hardware
 
-| Komponente | Spezifikation | Menge |
-| :--- | :--- | :---: |
-| **ESP32 DevKit** | 38-Pin Version (ESP-WROOM-32) | 1 |
-| **R503 Sensor** | Kapazitiver Fingerabdrucksensor (UART) | 1 |
-| **PN532 Modul** | NFC/RFID Controller (SPI-Mode) | 1 |
-| **DHT22** | Temperatur- & Luftfeuchtigkeitssensor | 1 |
-| **HLK-5M05** | AC-DC Wandler (230V auf 5V / 5W) | 1 |
-| **SN74AHCT125N** | Quad-Bus-Buffer (Logic Level Shifter 3.3V auf 5V) | 1 |
-| **Buzzer** | Aktiver 5V Summer | 1 |
-| **BC567** | NPN Transistor (Buzzer-Treiber) | 1 |
-| **Elektrolytkondensator** | **1000µF (Glättung & Pufferung)** | **2** |
-| **Elektrolytkondensator** | 470µF / 220µF | je 1 |
-| **Widerstand** | 1kΩ (Basiswiderstand) | 1 |
-| **RJ45 Buchsen** | Printmontage für Patchkabel-Link | 4 |
+Die Trennung von Innen- und Außeneinheit wird durch eine einfache Verbindung via Standard-RJ45-Patchkabel realisiert. Da hierüber sensible UART/SPI-Signale übertragen werden, ist die Kabellänge auf **maximal 30 cm** begrenzt und es sollte zwingend ein abgeschirmtes Kabel (z.B. CAT6/CAT7) verwendet werden.
 
----
+### 🏠 Inneneinheit (Sichere Zone)
+Hier befindet sich das "Gehirn" der Anlage.
+*   **Microcontroller:** ESP32 DevKit (38-Pin Version, ESP-WROOM-32).
+*   **Stromversorgung:** HLK-5M05 AC-DC Wandler (230V auf 5V / 5W). *Achtung: Arbeiten an 230V dürfen nur von Fachpersonal durchgeführt werden!*
+*   **Level Shifting:** SN74AHCT125N Quad-Bus-Buffer (wandelt 3.3V Signale des ESP32 sicher auf 5V für Peripherie).
+*   **Pufferung:** Elektrolytkondensatoren (2x 1000µF, 470µF, 220µF) glätten die Spannungsversorgung, insbesondere bei Lastspitzen des Fingerprint-Sensors.
+*   **Schnittstellen:** RJ45 Buchsen zur Verbindung mit der Außeneinheit. Eine Stiftleiste für zukünftige I2C-Erweiterungen (z.B. OLED-Display) ist vorgesehen.
 
-## ⚙️ Home Assistant & Software-Funktionen
-
-Dank der ESPHome-Integration bietet das System eine intuitive Verwaltung direkt über das Home Assistant Dashboard:
-
-* ☝️ **Biometrische Registrierung:** Über den Button "Neuen Finger anlernen" wird der Enrollment-Prozess gestartet. Das System verwaltet bis zu 200 Fingerabdrücke und vergibt IDs automatisch.
-* 💳 **NFC-Management:** Unterstützt das Hinzufügen von UIDs über einen Lernmodus, der entweder per Software-Button oder durch ein dediziertes Master-Tag aktiviert wird.
-* 👤 **Dynamische Namensspeicherung:** Über das Textfeld "Name für neuen Zugang" in Home Assistant kann der Name einer Person eingetippt werden. Drückt man anschließend auf "Anlernen" oder legt im NFC-Lernmodus ein Tag auf, wird der Name lokal auf dem Gate gespeichert und mit dem Tag/Fingerabdruck verknüpft. Sobald die Person später die Tür öffnet, wird der Name im Sensor "Letzter Zugang" angezeigt. Das Textfeld leert sich nach dem Speichern automatisch.
-* 🔘 **Benutzer-Interaktion:** Zwei programmierbare Buttons (Haustür Button 1 & 2) können für beliebige HA-Aktionen wie Klingelfunktionen oder Lichtsteuerung genutzt werden.
-* 🔊 **Status-Feedback:** Akustische Signale über den Buzzer sowie visuelles Feedback über die Aura-LED des R503 Sensors informieren über den Erfolg oder Fehler eines Zutrittsversuchs. Im Ruhezustand leuchtet die LED dauerhaft blau. Bei Verbindungsverlust zum WLAN pulsiert die LED rot.
-* 🌦️ **Umweltdaten:** Der integrierte DHT22-Sensor liefert Außentemperatur und Luftfeuchtigkeit direkt an Home Assistant (inkl. anpassbarem Offset).
+### 🚪 Außeneinheit (Benutzerschnittstelle)
+Diese Einheit wird außen an der Haustür montiert.
+*   **Biometrie:** R503 Kapazitiver Fingerabdrucksensor (UART-Kommunikation).
+*   **RFID/NFC:** PN532 Modul im SPI-Modus.
+*   **Umwelt:** DHT22 Sensor für Außentemperatur und Luftfeuchtigkeit.
+*   **Interaktion:** Zwei Hardware-Taster ("Haustür Button 1 & 2") und ein Türkontakt-Sensor.
+*   **Feedback:** Aktiver 5V Summer (Buzzer), angetrieben durch einen BC567 NPN Transistor. Visuelles Feedback über den LED-Ring des R503 Sensors.
 
 ---
 
-## 🚀 Installation & Konfiguration
+## ⚙️ Home Assistant & Software-Funktionen (Mini-Doku)
 
-Für die Inbetriebnahme sind folgende Schritte erforderlich:
+Nachdem das ESPHome-Gerät in Home Assistant integriert wurde, stehen zahlreiche Entitäten zur Verfügung. Hier wird im Detail erklärt, wie das System bedient wird:
 
-1. **Hardware-Setup:** Verbinden Sie die Innen- und Außeneinheit über die RJ45-Schnittstellen, bevor Sie die Netzspannung (230V) an das HLK-5M05 Modul anlegen.
-2. **Secrets anlegen:** Erstellen Sie eine `secrets.yaml` Datei in Ihrem ESPHome-Verzeichnis mit den notwendigen Zugangsdaten:
-   ```yaml
-   wifi_ssid: "IHR_WLAN_NAME"
-   wifi_password: "IHR_WLAN_PASSWORT"
-   wifi_ap_password: "FALLBACK_AP_PASSWORT"
-   api_encryption_key: "IHR_API_KEY"
-   ota_password: "IHR_OTA_PASSWORT"
-   master_tag_id: '"DE-AD-BE-EF"' # Ihre Master-Tag UID
-   ```
-3. **Master-Tag Konfiguration:** Um den administrativen Zugriff vor Ort zu ermöglichen, wird die UID Ihres persönlichen Master-Tags in der `secrets.yaml` Datei hinterlegt. Das Auflegen des Master-Tags toggelt den Anlernmodus (mit visuellem und akustischem Feedback).
-4. **Firmware-Flash:** Kompilieren Sie die Konfiguration (`insane-haustür-gate.yaml`) in ESPHome und führen Sie den ersten Flash-Vorgang via USB durch. Zukünftige Updates können bequem über die OTA-Schnittstelle (Over-the-Air) eingespielt werden.
-5. **Home Assistant Integration:** Nach dem erfolgreichen Booten wird das Gerät automatisch als neue Integration erkannt. Fügen Sie es hinzu, um alle Entitäten für das Fingerabdruck-Management, NFC-Whitelist, Buttons und Sensoren zu erhalten.
+### 1. Benutzerverwaltung & Namen
+Ein einzigartiges Feature ist die direkte Benennung von Tags und Fingern.
+1.  Suchen Sie das Textfeld **"Name für neuen Zugang"** im Home Assistant Dashboard.
+2.  Tippen Sie den Namen der Person ein (z.B. "Max Mustermann").
+3.  Führen Sie anschließend den Anlernvorgang für NFC oder Fingerabdruck durch (siehe unten).
+4.  Das System verknüpft die ID mit dem Namen. Das Textfeld leert sich danach automatisch.
+5.  Öffnet Max nun die Tür, ändert sich der Sensor **"Letzter Zugang"** auf "Max Mustermann".
+
+### 2. NFC / RFID Tags anlernen (Whitelist)
+Das System nutzt eine lokale Whitelist, die als langer String im ESP32 gespeichert ist. Es gibt zwei Wege, Tags anzulernen:
+
+*   **Methode A (Über Home Assistant):**
+    1.  Optional: Namen in das Feld "Name für neuen Zugang" eingeben.
+    2.  Drücken Sie den Button **"Nächsten Tag anlernen"**.
+    3.  Der Sensor "Lernmodus Status (NFC)" wechselt auf "Aktiv - Karte auflegen...".
+    4.  Halten Sie den neuen Tag an den Leser. Der Tag wird gespeichert (Buzzer piept zur Bestätigung).
+*   **Methode B (Über das Master-Tag):**
+    1.  Sie müssen die UID eines speziellen "Master-Tags" in der `secrets.yaml` definieren.
+    2.  Halten Sie das Master-Tag an den Leser. Das System wechselt in den Lernmodus (visuelles/akustisches Feedback).
+    3.  Halten Sie nun neue Tags an den Leser, um diese anzulernen.
+
+Um **alle** Tags zu löschen, drücken Sie in Home Assistant auf **"Whitelist komplett löschen"**. Einzelne Tags können derzeit nur durch komplettes Löschen und Neuanlernen der restlichen Tags entfernt werden.
+
+### 3. Fingerabdrücke anlernen
+Der R503 Sensor verwaltet bis zu 200 Fingerabdrücke. Die Verwaltung der IDs übernimmt der ESP32 automatisch (`next_finger_id`).
+1.  Optional: Namen in das Feld "Name für neuen Zugang" eingeben.
+2.  Drücken Sie den Button **"Neuen Finger anlernen (Auto-ID)"**.
+3.  Beobachten Sie den Sensor **"Fingerprint Status"**. Er fordert Sie auf, den Finger aufzulegen.
+4.  Legen Sie den Finger **zweimal** auf den Sensor (warten Sie auf das Blinken/Piepen dazwischen).
+5.  Bei Erfolg meldet der Status "Erfolgreich!" und die ID wird mit dem Namen verknüpft.
+
+### 4. Status-Feedback (LED & Buzzer)
+Der R503 Sensor verfügt über einen RGB-LED Ring (Aura LED), der zusammen mit dem Buzzer Feedback gibt:
+*   **Dauerhaft Blau:** System ist bereit (Idle).
+*   **Grün blinkend + kurzer Piepton:** Zugriff gewährt (Finger/Tag erkannt) oder Aktion erfolgreich.
+*   **Rot blinkend + langer Piepton:** Zugriff verweigert (unbekannter Tag/Finger) oder Fehler beim Anlernen.
+*   **Rot pulsierend:** Das System hat die WLAN-Verbindung verloren. (Türöffnung funktioniert weiterhin!).
+
+### 5. Weitere Sensoren & Buttons
+*   **Haustürzugang (Lock-Entität):** Schaltet für 2 Sekunden auf `true`, wenn ein gültiger Finger oder Tag präsentiert wird. Diesen Sensor nutzen Sie in Home Assistant als Auslöser (Trigger), um Ihre tatsächliche Türöffner-Automation (Nuki, Relais etc.) zu starten.
+*   **Haustür Button 1 & 2:** Hardware-Taster an der Außeneinheit. Lösen in Home Assistant ein Event aus (z.B. als smarte Türklingel nutzbar). Beim Drücken ertönt ein kurzer Bestätigungston am Gate.
+*   **Temperatur & Luftfeuchtigkeit:** Liefert Umweltdaten des DHT22. Über die numerischen Felder "Temperatur Offset" und "Luftfeuchtigkeit Offset" können Ungenauigkeiten durch das Gehäuse direkt in Home Assistant korrigiert werden.
+
+---
+
+## 🚀 Installation & Inbetriebnahme (Schritt-für-Schritt)
+
+1.  **Hardware-Aufbau:** Löten Sie die Platinen gemäß den Schaltplänen und bestücken Sie die Komponenten. *Gerber-Dateien für die PCB-Fertigung liegen im ZIP-Archiv bei.*
+2.  **Verkabelung:** Verbinden Sie Innen- und Außeneinheit zwingend **vor** dem Einschalten mit den RJ45-Kabeln (max. 30cm, geschirmt).
+3.  **Secrets konfigurieren:** Erstellen Sie im gleichen Verzeichnis wie die `insane-haustür-gate.yaml` eine Datei namens `secrets.yaml` und füllen Sie diese mit Ihren Daten:
+    ```yaml
+    wifi_ssid: "IhrWlanName"
+    wifi_password: "IhrWlanPasswort"
+    wifi_ap_password: "EinSicheresFallbackPasswort"
+    api_encryption_key: "GenerierenSieEinenBase64Key"
+    ota_password: "IhrOTAPasswort"
+    master_tag_id: '"DE-AD-BE-EF"' # WICHTIG: Die UID Ihres Master-Tags für den Lernmodus
+    ```
+    *Tipp zur Master-Tag ID:* Wenn Sie die ID noch nicht kennen, flashen Sie das Gerät zuerst ohne Master-Tag, halten Sie einen Tag an den Leser und suchen Sie im ESPHome-Log nach der Zeile `Zugriff verweigert: XX-XX-XX-XX`. Tragen Sie diese ID dann in die Secrets ein und flashen Sie erneut.
+4.  **Flashen:** Kompilieren Sie die `insane-haustür-gate.yaml` über das ESPHome Dashboard und flashen Sie den ESP32 das erste Mal per USB-Kabel.
+5.  **Integration in Home Assistant:** Sobald der ESP32 im WLAN ist, taucht er unter "Geräte & Dienste" in Home Assistant auf. Konfigurieren Sie ihn dort.
+6.  **Erster Test:** Geben Sie einen Namen im Textfeld ein und lernen Sie Ihren ersten Finger oder Tag an!
 
 ---
 
 ## 🔌 Technische Spezifikationen (Pin-Belegung)
 
-| Schnittstelle | GPIO Pins | Details |
+Diese Belegung ist in der YAML fest kodiert. Wenn Sie eigene PCBs entwerfen, halten Sie sich an dieses Mapping.
+
+| Komponente / Schnittstelle | GPIO Pin (ESP32) | Details & Protokoll |
 | :--- | :--- | :--- |
-| **Fingerprint (UART)** | 16 (RX), 17 (TX), 33 (Sensing) | 57600 baud |
-| **NFC Reader (SPI)** | 18 (CLK), 19 (MISO), 23 (MOSI), 5 (CS) | SPI Bus |
-| **Umweltsensor** | 4 (DHT22) | Temperatur & Feuchtigkeit |
-| **Signalgeber** | 2 (Buzzer) | PWM-gesteuert |
-| **Eingänge (Buttons & Kontakt)** | 14, 27 (Buttons), 32 (Kontakt) | Input mit Pullup |
+| **Fingerprint R503 (RX)** | GPIO 16 | UART (57600 baud) |
+| **Fingerprint R503 (TX)** | GPIO 17 | UART (57600 baud) |
+| **Fingerprint R503 (Wake)**| GPIO 33 | Sensing/Touch Pin |
+| **NFC PN532 (SCK)** | GPIO 18 | SPI Clock |
+| **NFC PN532 (MISO)** | GPIO 19 | SPI Master In Slave Out |
+| **NFC PN532 (MOSI)** | GPIO 23 | SPI Master Out Slave In |
+| **NFC PN532 (CS)** | GPIO 5 | SPI Chip Select |
+| **DHT22 Umweltsensor** | GPIO 4 | One-Wire |
+| **Buzzer (Summer)** | GPIO 2 | PWM-gesteuert, Invertiert |
+| **Button 1 (Klingel)** | GPIO 14 | Input mit internem Pullup |
+| **Button 2** | GPIO 27 | Input mit internem Pullup |
+| **Türkontakt** | GPIO 32 | Input mit internem Pullup |
 
 ---
+
+## ❓ Häufige Fragen & Troubleshooting
+
+*   **Der Fingerprint-Sensor leuchtet nicht / wird nicht erkannt.**
+    *   Prüfen Sie die Verkabelung (RX/TX vertauscht?).
+    *   Stellen Sie sicher, dass das Netzteil genug Strom liefert. Der Sensor zieht beim Scannen kurzzeitig viel Strom (dafür sind die Kondensatoren da).
+*   **Der NFC-Leser funktioniert sporadisch nicht.**
+    *   Das SPI-Signal ist sehr empfindlich. Ist das RJ45-Kabel zu lang (>30cm)? Ist es ungeschirmt? Verwenden Sie hochwertigere Kabel.
+*   **Die `whitelist_str` Variable ist zu lang / Speicher voll.**
+    *   ESPHome Strings in globalen Variablen sind technisch auf den verfügbaren RAM/Flash begrenzt. Für ein normales Einfamilienhaus (20-30 Tags) ist dies völlig unproblematisch. Bei hunderten Tags sollte das Konzept überdacht werden.
+*   **Wie ändere ich einen falsch geschriebenen Namen?**
+    *   Derzeit müssen Sie den entsprechenden Tag/Finger ignorieren oder die Whitelist/Finger löschen und neu anlegen. (Finger können im R503 nicht einzeln überschrieben werden, ohne ein externes Tool zu nutzen).
 
 <p align="center">
   <i>💡 <b>Hinweis:</b> Die zugehörigen Gerber-Dateien für die Fertigung der Platinen sind im Unterordner als ZIP-Archiv verfügbar.</i>
