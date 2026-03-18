@@ -45,7 +45,15 @@ globals:
 
   - id: temp_enroll_id
     type: int
-    initial_value: '1'
+    initial_value: "1"
+
+  - id: finger_names_str
+    type: std::string
+    restore_value: yes
+
+  - id: nfc_names_str
+    type: std::string
+    restore_value: yes
 
 # ==============================================================================
 # NETZWERK & API
@@ -107,6 +115,30 @@ fingerprint_grow:
     - lambda: |-
         id(finger_status).publish_state("Zugang gewährt (ID: " + to_string(finger_id) + ")");
         id(haustuerzugang).publish_state(true);
+        std::string names = id(finger_names_str);
+        char search_buf[32];
+        sprintf(search_buf, "%d=", finger_id);
+        std::string search_str = search_buf;
+        size_t pos = names.find(search_str);
+
+        bool found = false;
+        while (pos != std::string::npos) {
+            if (pos == 0 || names[pos - 1] == ';') {
+                pos += search_str.length();
+                size_t end_pos = names.find(";", pos);
+                if (end_pos != std::string::npos) {
+                    std::string found_name = names.substr(pos, end_pos - pos);
+                    id(last_access_name).publish_state(found_name);
+                    found = true;
+                    break;
+                }
+            }
+            pos = names.find(search_str, pos + 1);
+        }
+
+        if (!found) {
+            id(last_access_name).publish_state("Unbekannt (Kein Name)");
+        }
     - script.execute: led_success
     - script.execute: beep_done
     - delay: 2s
@@ -148,7 +180,16 @@ fingerprint_grow:
   on_enrollment_done:
     - script.execute: led_party
     - script.execute: beep_success
-    - lambda: 'id(finger_status).publish_state("Erfolgreich!");'
+    - lambda: |-
+        id(finger_status).publish_state("Erfolgreich!");
+        std::string name = id(input_new_name).state;
+        if (!name.empty()) {
+          char buf[128];
+          sprintf(buf, "%d=%s;", id(temp_enroll_id), name.c_str());
+          id(finger_names_str) += buf;
+          id(input_new_name).publish_state("");
+        }
+        id(r503).update(); // Hardware-Update triggern
     - delay: 3s
     - lambda: 'id(finger_status).publish_state("Bereit");'
 
@@ -195,9 +236,18 @@ pn532_spi:
 
           // Lernmodus: Neue Karte speichern
           if (id(learn_mode)) {
-            if (id(whitelist_str).find(current_uid) == std::string::npos) {
+            std::string search_str = "," + current_uid + ",";
+            std::string whitelist_padded = "," + id(whitelist_str) + ",";
+            if (whitelist_padded.find(search_str) == std::string::npos) {
               if (!id(whitelist_str).empty()) id(whitelist_str) += ",";
               id(whitelist_str) += current_uid;
+              std::string name = id(input_new_name).state;
+              if (!name.empty()) {
+                char buf[128];
+                sprintf(buf, "%s=%s;", current_uid.c_str(), name.c_str());
+                id(nfc_names_str) += buf;
+                id(input_new_name).publish_state("");
+              }
               id(beep_success).execute();
               id(led_party).execute();
               id(whitelist_display).update();
@@ -210,9 +260,35 @@ pn532_spi:
           }
 
           // Normalbetrieb: Zugangsprüfung
-          if (id(whitelist_str).find(current_uid) != std::string::npos) {
+          std::string search_str = "," + current_uid + ",";
+          std::string whitelist_padded = "," + id(whitelist_str) + ",";
+          if (whitelist_padded.find(search_str) != std::string::npos) {
             ESP_LOGI("nfc_gate", "Zugriff gewährt: %s", current_uid.c_str());
             id(haustuerzugang).publish_state(true);
+
+            std::string names = id(nfc_names_str);
+            std::string name_search = current_uid + "=";
+            size_t pos = names.find(name_search);
+
+            bool found = false;
+            while (pos != std::string::npos) {
+                if (pos == 0 || names[pos - 1] == ';') {
+                    pos += name_search.length();
+                    size_t end_pos = names.find(";", pos);
+                    if (end_pos != std::string::npos) {
+                        std::string found_name = names.substr(pos, end_pos - pos);
+                        id(last_access_name).publish_state(found_name);
+                        found = true;
+                        break;
+                    }
+                }
+                pos = names.find(name_search, pos + 1);
+            }
+
+            if (!found) {
+                id(last_access_name).publish_state("Unbekannt (Kein Name)");
+            }
+
             id(beep_success).execute();
             id(led_success).execute();
             
@@ -309,7 +385,21 @@ binary_sensor:
 # ==============================================================================
 # TEXT & STATUS
 # ==============================================================================
+text:
+  - platform: template
+    name: "Name für neuen Zugang"
+    id: input_new_name
+    optimistic: true
+    min_length: 0
+    max_length: 32
+    mode: text
+
 text_sensor:
+  - platform: template
+    name: "Letzter Zugang"
+    id: last_access_name
+    icon: "mdi:account-check"
+
   - platform: template
     name: "Gespeicherte UIDs"
     entity_category: "diagnostic"
