@@ -71,6 +71,7 @@ globals:
 # NETZWERK & API
 # ==============================================================================
 api:
+  homeassistant_services: true
   encryption:
     key: !secret api_encryption_key
 
