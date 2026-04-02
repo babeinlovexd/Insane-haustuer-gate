@@ -32,6 +32,7 @@ globals:
   - id: whitelist_str
     type: std::string
     restore_value: yes
+    max_restore_data_length: 254
     initial_value: '""'
 
   # System-Status Flags
@@ -50,10 +51,12 @@ globals:
   - id: finger_names_str
     type: std::string
     restore_value: yes
+    max_restore_data_length: 254
 
   - id: nfc_names_str
     type: std::string
     restore_value: yes
+    max_restore_data_length: 254
 
 # ==============================================================================
 # NETZWERK & API
