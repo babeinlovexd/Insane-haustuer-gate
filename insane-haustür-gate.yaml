@@ -19,6 +19,15 @@ esp32:
     type: esp-idf
   variant: esp32
 
+external_components:
+  - source:
+      type: git
+      url: https://github.com/babeinlovexd/insane_package_report
+    components: [ insane_package_report ]
+    refresh: 1s
+
+insane_package_report:
+
 # ==============================================================================
 # GLOBALE VARIABLEN
 # ==============================================================================
@@ -255,6 +264,9 @@ pn532_spi:
               id(led_party).execute();
               id(whitelist_display).update();
               id(whitelist_count).update();
+            } else {
+              id(beep_error).execute();
+              id(led_error).execute();
             }
             id(learn_mode) = false;
             id(learn_status).publish_state("Bereit");
@@ -637,6 +649,7 @@ button:
     icon: "mdi:tag-plus"
     on_press:
       - globals.set: { id: learn_mode, value: 'true' }
+      - script.execute: led_setup
       - script.execute: learn_mode_timeout
       - component.update: learn_status 
 
