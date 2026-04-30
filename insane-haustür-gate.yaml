@@ -5,6 +5,8 @@
 esphome:
   name: "haustur-gate"
   friendly_name: Haustür Gate
+  includes:
+    - algorithm
   on_boot:
     priority: -10
     then:
@@ -130,7 +132,7 @@ fingerprint_grow:
         id(haustuerzugang).publish_state(true);
         std::string names = id(finger_names_str);
         char search_buf[32];
-        sprintf(search_buf, "%d=", finger_id);
+        snprintf(search_buf, sizeof(search_buf), "%d=", finger_id);
         std::string search_str = search_buf;
         size_t pos = names.find(search_str);
 
@@ -187,7 +189,7 @@ fingerprint_grow:
     - script.execute: beep_success
     - lambda: |-
         char buf[32];
-        sprintf(buf, "Scan %d von 4 ok...", scan_num);
+        snprintf(buf, sizeof(buf), "Scan %d von 4 ok...", scan_num);
         id(finger_status).publish_state(buf);
 
   on_enrollment_done:
@@ -197,8 +199,12 @@ fingerprint_grow:
         id(finger_status).publish_state("Erfolgreich!");
         std::string name = id(input_new_name).state;
         if (!name.empty()) {
+          // Sanitize input: Replace '=' and ';' to prevent injection
+          std::replace(name.begin(), name.end(), '=', '_');
+          std::replace(name.begin(), name.end(), ';', '_');
+
           char buf[128];
-          sprintf(buf, "%d=%s;", id(temp_enroll_id), name.c_str());
+          snprintf(buf, sizeof(buf), "%d=%s;", id(temp_enroll_id), name.c_str());
           id(finger_names_str) += buf;
           id(input_new_name).publish_state("");
         }
@@ -225,8 +231,8 @@ pn532_spi:
           // UID lesen
           std::string current_uid = "";
           for (size_t i = 0; i < tag.get_uid().size(); i++) {
-              char buf[3];
-              sprintf(buf, "%02X", tag.get_uid()[i]);
+              char buf[4];
+              snprintf(buf, sizeof(buf), "%02X", tag.get_uid()[i]);
               current_uid += buf;
               if (i < tag.get_uid().size() - 1) current_uid += "-";
           }
@@ -256,8 +262,12 @@ pn532_spi:
               id(whitelist_str) += current_uid;
               std::string name = id(input_new_name).state;
               if (!name.empty()) {
+                // Sanitize input: Replace '=' and ';' to prevent injection
+                std::replace(name.begin(), name.end(), '=', '_');
+                std::replace(name.begin(), name.end(), ';', '_');
+
                 char buf[128];
-                sprintf(buf, "%s=%s;", current_uid.c_str(), name.c_str());
+                snprintf(buf, sizeof(buf), "%s=%s;", current_uid.c_str(), name.c_str());
                 id(nfc_names_str) += buf;
                 id(input_new_name).publish_state("");
               }
@@ -448,7 +458,7 @@ text_sensor:
       if (!id(finger_count_val).has_state()) return {"Lade Daten..."};
       int count = (int)id(finger_count_val).state;
       char buf[64];
-      sprintf(buf, "%d von 200 belegt", count);
+      snprintf(buf, sizeof(buf), "%d von 200 belegt", count);
       return {buf};
 
 # ==============================================================================
@@ -669,7 +679,7 @@ button:
             id(temp_enroll_id) = next_id; // In globaler Variable speichern
             
             char buf[64];
-            sprintf(buf, "ID %d: Bitte 4x auflegen...", next_id);
+            snprintf(buf, sizeof(buf), "ID %d: Bitte 4x auflegen...", next_id);
             id(finger_status).publish_state(buf);
 
         # Schritt B:ESPHome-Action starten
