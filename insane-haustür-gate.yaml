@@ -128,7 +128,7 @@ fingerprint_grow:
     - lambda: |-
         id(finger_status).publish_state("Zugang gewährt (ID: " + to_string(finger_id) + ")");
         id(haustuerzugang).publish_state(true);
-        std::string names = id(finger_names_str);
+        const std::string &names = id(finger_names_str);
         char search_buf[32];
         sprintf(search_buf, "%d=", finger_id);
         std::string search_str = search_buf;
@@ -282,7 +282,7 @@ pn532_spi:
             ESP_LOGI("nfc_gate", "Zugriff gewährt: %s", current_uid.c_str());
             id(haustuerzugang).publish_state(true);
 
-            std::string names = id(nfc_names_str);
+            const std::string &names = id(nfc_names_str);
             std::string name_search = current_uid + "=";
             size_t pos = names.find(name_search);
 
@@ -354,7 +354,7 @@ sensor:
     id: whitelist_count
     icon: "mdi:account-group"
     lambda: |-
-      std::string s = id(whitelist_str);
+      const std::string &s = id(whitelist_str);
       if (s.empty()) return 0.0f;
       int dashes = std::count(s.begin(), s.end(), '-');
       return (float)(dashes / 3);
