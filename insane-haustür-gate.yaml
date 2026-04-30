@@ -2,6 +2,24 @@
 # INSANE HAUSTÜR GATE v2.0 - PRODUCTION RELEASE
 # ==============================================================================
 
+substitutions:
+  # Status-Nachrichten (Magic Strings)
+  txt_ready: "Bereit"
+  txt_scanning: "Scanne..."
+  txt_access_granted: "Zugang gewährt"
+  txt_unknown_name: "Unbekannt (Kein Name)"
+  txt_finger_unknown: "Finger unbekannt"
+  txt_finger_misplaced: "Finger falsch aufgelegt"
+  txt_scan_invalid: "Scan fehlerhaft"
+  txt_success: "Erfolgreich!"
+  txt_error_aborted: "Abgebrochen/Fehler"
+  txt_learn_active: "Aktiv - Karte auflegen..."
+  txt_db_deleted: "Datenbank gelöscht!"
+  txt_scan_ok: "Scan %d von 4 ok..."
+  txt_enroll_prompt: "ID %d: Bitte 4x auflegen..."
+  txt_loading_data: "Lade Daten..."
+  txt_fingerprint_usage: "%d von 200 belegt"
+
 esphome:
   name: "haustur-gate"
   friendly_name: Haustür Gate
@@ -119,14 +137,14 @@ fingerprint_grow:
         color: YELLOW
         speed: 0
         count: 1
-    - lambda: 'id(finger_status).publish_state("Scanne...");'
+    - lambda: 'id(finger_status).publish_state("${txt_scanning}");'
     - delay: 2s 
     - script.execute: led_idle
   
   # --- Ergebnis: Treffer ---
   on_finger_scan_matched:
     - lambda: |-
-        id(finger_status).publish_state("Zugang gewährt (ID: " + to_string(finger_id) + ")");
+        id(finger_status).publish_state("${txt_access_granted} (ID: " + to_string(finger_id) + ")");
         id(haustuerzugang).publish_state(true);
         std::string names = id(finger_names_str);
         char search_buf[32];
@@ -150,36 +168,36 @@ fingerprint_grow:
         }
 
         if (!found) {
-            id(last_access_name).publish_state("Unbekannt (Kein Name)");
+            id(last_access_name).publish_state("${txt_unknown_name}");
         }
     - script.execute: led_success
     - script.execute: beep_done
     - delay: 2s
     - lambda: |-
-        id(finger_status).publish_state("Bereit");
+        id(finger_status).publish_state("${txt_ready}");
         id(haustuerzugang).publish_state(false);
   
   # --- Ergebnis: Kein Treffer ---
   on_finger_scan_unmatched:
-    - lambda: 'id(finger_status).publish_state("Finger unbekannt");'
+    - lambda: 'id(finger_status).publish_state("${txt_finger_unknown}");'
     - script.execute: led_error
     - script.execute: beep_error
     - delay: 5s
-    - lambda: 'id(finger_status).publish_state("Bereit");'
+    - lambda: 'id(finger_status).publish_state("${txt_ready}");'
 
   on_finger_scan_misplaced:
-    - lambda: 'id(finger_status).publish_state("Finger falsch aufgelegt");'
+    - lambda: 'id(finger_status).publish_state("${txt_finger_misplaced}");'
     - script.execute: led_warning
     - script.execute: beep_error
     - delay: 2s
-    - lambda: 'id(finger_status).publish_state("Bereit");'
+    - lambda: 'id(finger_status).publish_state("${txt_ready}");'
 
   on_finger_scan_invalid:
-    - lambda: 'id(finger_status).publish_state("Scan fehlerhaft");'
+    - lambda: 'id(finger_status).publish_state("${txt_scan_invalid}");'
     - script.execute: led_warning
     - script.execute: beep_error
     - delay: 3s
-    - lambda: 'id(finger_status).publish_state("Bereit");'
+    - lambda: 'id(finger_status).publish_state("${txt_ready}");'
 
   # --- Anlern-Prozess ---
   on_enrollment_scan:
@@ -187,14 +205,14 @@ fingerprint_grow:
     - script.execute: beep_success
     - lambda: |-
         char buf[32];
-        sprintf(buf, "Scan %d von 4 ok...", scan_num);
+        sprintf(buf, "${txt_scan_ok}", scan_num);
         id(finger_status).publish_state(buf);
 
   on_enrollment_done:
     - script.execute: led_party
     - script.execute: beep_success
     - lambda: |-
-        id(finger_status).publish_state("Erfolgreich!");
+        id(finger_status).publish_state("${txt_success}");
         std::string name = id(input_new_name).state;
         if (!name.empty()) {
           char buf[128];
@@ -204,14 +222,14 @@ fingerprint_grow:
         }
         id(r503).update(); // Hardware-Update triggern
     - delay: 3s
-    - lambda: 'id(finger_status).publish_state("Bereit");'
+    - lambda: 'id(finger_status).publish_state("${txt_ready}");'
 
   on_enrollment_failed:
     - script.execute: led_error
     - script.execute: beep_error
-    - lambda: 'id(finger_status).publish_state("Abgebrochen/Fehler");'
+    - lambda: 'id(finger_status).publish_state("${txt_error_aborted}");'
     - delay: 2s
-    - lambda: 'id(finger_status).publish_state("Bereit");'
+    - lambda: 'id(finger_status).publish_state("${txt_ready}");'
 
 # ==============================================================================
 # HAUPTLOGIK: NFC READER (PN532)
@@ -243,7 +261,7 @@ pn532_spi:
               id(beep_error).execute();
               id(led_error).execute();
             }
-            id(learn_status).publish_state(id(learn_mode) ? "Aktiv - Karte auflegen..." : "Bereit");
+            id(learn_status).publish_state(id(learn_mode) ? "${txt_learn_active}" : "${txt_ready}");
             return;
           }
 
@@ -270,7 +288,7 @@ pn532_spi:
               id(led_error).execute();
             }
             id(learn_mode) = false;
-            id(learn_status).publish_state("Bereit");
+            id(learn_status).publish_state("${txt_ready}");
             id(learn_mode_timeout).stop();
             return;
           }
@@ -302,7 +320,7 @@ pn532_spi:
             }
 
             if (!found) {
-                id(last_access_name).publish_state("Unbekannt (Kein Name)");
+                id(last_access_name).publish_state("${txt_unknown_name}");
             }
 
             id(beep_success).execute();
@@ -427,15 +445,15 @@ text_sensor:
     id: learn_status
     icon: "mdi:school"
     lambda: |-
-      if (id(learn_mode)) return {"Aktiv - Karte auflegen..."};
-      return {"Bereit"};
+      if (id(learn_mode)) return {"${txt_learn_active}"};
+      return {"${txt_ready}"};
 
   - platform: template
     name: "Fingerprint Status" 
     id: finger_status
     icon: "mdi:fingerprint"
     lambda: |-
-      if (id(finger_status).state.empty()) return {"Bereit"};
+      if (id(finger_status).state.empty()) return {"${txt_ready}"};
       return {};
 
   - platform: template
@@ -445,10 +463,10 @@ text_sensor:
     icon: "mdi:memory"
     update_interval: 30s
     lambda: |-
-      if (!id(finger_count_val).has_state()) return {"Lade Daten..."};
+      if (!id(finger_count_val).has_state()) return {"${txt_loading_data}"};
       int count = (int)id(finger_count_val).state;
       char buf[64];
-      sprintf(buf, "%d von 200 belegt", count);
+      sprintf(buf, "${txt_fingerprint_usage}", count);
       return {buf};
 
 # ==============================================================================
@@ -603,7 +621,7 @@ script:
           condition: { lambda: 'return id(learn_mode);' }
           then:
             - globals.set: { id: learn_mode, value: 'false' }
-            - lambda: 'id(learn_status).publish_state("Bereit");' 
+            - lambda: 'id(learn_status).publish_state("${txt_ready}");'
             - script.execute: beep_error
             - script.execute: led_idle
 
@@ -669,7 +687,7 @@ button:
             id(temp_enroll_id) = next_id; // In globaler Variable speichern
             
             char buf[64];
-            sprintf(buf, "ID %d: Bitte 4x auflegen...", next_id);
+            sprintf(buf, "${txt_enroll_prompt}", next_id);
             id(finger_status).publish_state(buf);
 
         # Schritt B:ESPHome-Action starten
@@ -695,12 +713,12 @@ button:
       then:
         - fingerprint_grow.delete_all: 
         - lambda: |-
-            id(finger_status).publish_state("Datenbank gelöscht!");
+            id(finger_status).publish_state("${txt_db_deleted}");
             id(finger_count_val).publish_state(0);
         - script.execute: beep_error
         - delay: 3s
         - script.execute: led_idle
-        - lambda: 'id(finger_status).publish_state("Bereit");'
+        - lambda: 'id(finger_status).publish_state("${txt_ready}");'
 
 # ==============================================================================
 # WATCHDOG
