@@ -1,5 +1,5 @@
 # ==============================================================================
-# INSANE HAUSTÜR GATE v2.0 - PRODUCTION RELEASE
+# INSANE HAUSTÜR GATE v2.2
 # ==============================================================================
 
 substitutions:
@@ -407,22 +407,22 @@ binary_sensor:
       - delayed_on: 100ms # Entprellung gegen Wind/Klappern
       - delayed_off: 100ms
 
-  # --- NEU: Virtueller Status für Home Assistant Automationen ---
+  # --- Virtueller Status für Home Assistant Automationen ---
   - platform: template
     name: "Insane Türklingel Status"
     id: virtual_doorbell_status
 
-  # --- GEÄNDERT: Physischer Hardware-Pin ---
+  # --- Physischer Hardware-Pin ---
   - platform: gpio
     pin:
       number: GPIO14
       mode: INPUT_PULLUP
       inverted: true
-    name: "Türklingel Hardware" # Eindeutiger Name, um Konflikt zu vermeiden
+    name: "Türklingel Hardware"
     id: doorbell_sensor
-    internal: true # Vor Home Assistant verstecken
+    internal: true
     filters:
-      - delayed_on: 10ms  # Zurück auf schnelles Auslösen
+      - delayed_on: 10ms
       - delayed_off: 10ms
     on_press:
       then:
@@ -672,7 +672,7 @@ button:
     entity_category: config 
     on_press:
       - globals.set: { id: whitelist_str, value: '""' }
-      - globals.set: { id: nfc_names_str, value: '""' } # <-- Diese Zeile ergänzen
+      - globals.set: { id: nfc_names_str, value: '""' }
       - lambda: 'id(whitelist_display).update(); id(whitelist_count).update();'
       - script.execute: beep_error
 
@@ -718,7 +718,6 @@ button:
       then:
         - script.execute: led_doorbell_effect
         - logger.log: "Türklingel ausgelöst"
-        # Triggert den HA Sensor für 1 Sekunde
         - binary_sensor.template.publish:
             id: virtual_doorbell_status
             state: ON
@@ -735,7 +734,7 @@ button:
     on_press:
       then:
         - fingerprint_grow.delete_all: 
-        - globals.set: { id: finger_names_str, value: '""' } # <-- Diese Zeile ergänzen
+        - globals.set: { id: finger_names_str, value: '""' }
         - lambda: |-
             id(finger_status).publish_state("${txt_db_deleted}");
             id(finger_count_val).publish_state(0);
