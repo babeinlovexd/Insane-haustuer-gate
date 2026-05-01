@@ -75,13 +75,27 @@ globals:
     type: int
     initial_value: "1"
 
-  - id: finger_names_str
+  # --- FINGERPRINT NAMEN (Verdoppelt) ---
+  - id: finger_names_str_1
     type: std::string
     restore_value: yes
     max_restore_data_length: 254
     initial_value: '""'
 
-  - id: nfc_names_str
+  - id: finger_names_str_2
+    type: std::string
+    restore_value: yes
+    max_restore_data_length: 254
+    initial_value: '""'
+
+  # --- NFC NAMEN (Verdoppelt) ---
+  - id: nfc_names_str_1
+    type: std::string
+    restore_value: yes
+    max_restore_data_length: 254
+    initial_value: '""'
+
+  - id: nfc_names_str_2
     type: std::string
     restore_value: yes
     max_restore_data_length: 254
@@ -148,7 +162,10 @@ fingerprint_grow:
     - lambda: |-
         id(finger_status).publish_state("${txt_access_granted} (ID: " + to_string(finger_id) + ")");
         id(haustuerzugang).publish_state(true);
-        const std::string &names = id(finger_names_str);
+
+        // Beide Strings zusammenfügen für die Suche:
+        std::string names = id(finger_names_str_1) + id(finger_names_str_2);
+
         char search_buf[32];
         sprintf(search_buf, "%d=", finger_id);
         std::string search_str = search_buf;
@@ -221,7 +238,18 @@ fingerprint_grow:
         if (!name.empty()) {
           std::replace(name.begin(), name.end(), '=', '_');
           std::replace(name.begin(), name.end(), ';', '_');
-          id(finger_names_str) += std::to_string(id(temp_enroll_id)) + "=" + name + ";";
+
+          std::string entry = std::to_string(id(temp_enroll_id)) + "=" + name + ";";
+
+          // Speichermanagement:
+          if (id(finger_names_str_1).length() + entry.length() <= 250) {
+            id(finger_names_str_1) += entry;
+          } else if (id(finger_names_str_2).length() + entry.length() <= 250) {
+            id(finger_names_str_2) += entry;
+          } else {
+            ESP_LOGE("finger", "Speicher voll!");
+          }
+
           id(input_new_name).publish_state("");
         }
     - delay: 3s
@@ -279,7 +307,17 @@ pn532_spi:
               if (!name.empty()) {
                 std::replace(name.begin(), name.end(), '=', '_');
                 std::replace(name.begin(), name.end(), ';', '_');
-                id(nfc_names_str) += current_uid + "=" + name + ";";
+
+                std::string entry = current_uid + "=" + name + ";";
+
+                if (id(nfc_names_str_1).length() + entry.length() <= 250) {
+                  id(nfc_names_str_1) += entry;
+                } else if (id(nfc_names_str_2).length() + entry.length() <= 250) {
+                  id(nfc_names_str_2) += entry;
+                } else {
+                  ESP_LOGE("nfc", "Speicher voll!");
+                }
+
                 id(input_new_name).publish_state("");
               }
               id(beep_success).execute();
@@ -303,7 +341,8 @@ pn532_spi:
             ESP_LOGI("nfc_gate", "Zugriff gewährt: %s", current_uid.c_str());
             id(haustuerzugang).publish_state(true);
 
-            const std::string &names = id(nfc_names_str);
+            // Beide Strings für die Suche zusammenfügen:
+            std::string names = id(nfc_names_str_1) + id(nfc_names_str_2);
             std::string name_search = current_uid + "=";
             size_t pos = names.find(name_search);
 
@@ -443,6 +482,30 @@ text_sensor:
     name: "Letzter Zugang"
     id: last_access_name
     icon: "mdi:account-check"
+
+  - platform: template
+    name: "Finger DB 1"
+    entity_category: "diagnostic"
+    id: display_finger_db1
+    lambda: 'return id(finger_names_str_1);'
+
+  - platform: template
+    name: "Finger DB 2"
+    entity_category: "diagnostic"
+    id: display_finger_db2
+    lambda: 'return id(finger_names_str_2);'
+
+  - platform: template
+    name: "NFC DB 1"
+    entity_category: "diagnostic"
+    id: display_nfc_db1
+    lambda: 'return id(nfc_names_str_1);'
+
+  - platform: template
+    name: "NFC DB 2"
+    entity_category: "diagnostic"
+    id: display_nfc_db2
+    lambda: 'return id(nfc_names_str_2);'
 
   - platform: template
     name: "Gespeicherte UIDs"
@@ -669,7 +732,8 @@ button:
     entity_category: config 
     on_press:
       - globals.set: { id: whitelist_str, value: '""' }
-      - globals.set: { id: nfc_names_str, value: '""' }
+      - globals.set: { id: nfc_names_str_1, value: '""' }
+      - globals.set: { id: nfc_names_str_2, value: '""' }
       - lambda: 'id(whitelist_display).update(); id(whitelist_count).update();'
       - script.execute: beep_error
 
@@ -731,7 +795,8 @@ button:
     on_press:
       then:
         - fingerprint_grow.delete_all: 
-        - globals.set: { id: finger_names_str, value: '""' }
+        - globals.set: { id: finger_names_str_1, value: '""' }
+        - globals.set: { id: finger_names_str_2, value: '""' }
         - lambda: |-
             id(finger_status).publish_state("${txt_db_deleted}");
             id(finger_count_val).publish_state(0);
