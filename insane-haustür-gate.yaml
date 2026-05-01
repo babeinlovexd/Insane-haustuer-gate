@@ -35,6 +35,8 @@ esp32:
   board: esp32dev
   framework:
     type: esp-idf
+    sdkconfig_options:
+      CONFIG_ESP_MAIN_TASK_STACK_SIZE: "16384"
   variant: esp32
 
 external_components:
@@ -230,6 +232,7 @@ fingerprint_grow:
         id(finger_status).publish_state(buf);
 
   on_enrollment_done:
+    - delay: 100ms
     - script.execute: led_party
     - script.execute: beep_success
     - lambda: |-
