@@ -233,6 +233,8 @@ fingerprint_grow:
         char buf[32];
         sprintf(buf, "${txt_scan_ok}", scan_num);
         id(finger_status).publish_state(buf);
+    - delay: 1s
+    - fingerprint_grow.aura_led_control: {state: ALWAYS_ON, color: PURPLE, speed: 0, count: 0}
 
   on_enrollment_done:
     - delay: 100ms
