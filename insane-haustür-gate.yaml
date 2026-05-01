@@ -15,8 +15,8 @@ substitutions:
   txt_error_aborted: "Abgebrochen/Fehler"
   txt_learn_active: "Aktiv - Karte auflegen..."
   txt_db_deleted: "Datenbank gelöscht!"
-  txt_scan_ok: "Scan %d von 4 ok..."
-  txt_enroll_prompt: "ID %d: Bitte 4x auflegen..."
+  txt_scan_ok: "Scan %d von 2 ok..."
+  txt_enroll_prompt: "ID %d: Bitte 2x auflegen..."
   txt_loading_data: "Lade Daten..."
   txt_fingerprint_usage: "%d von 200 belegt"
 
@@ -187,21 +187,23 @@ fingerprint_grow:
 
   on_finger_scan_misplaced:
     - lambda: 'id(finger_status).publish_state("${txt_finger_misplaced}");'
-    - script.execute: led_warning
+    - fingerprint_grow.aura_led_control: {state: FLASHING, speed: 25, color: YELLOW, count: 3}
     - script.execute: beep_error
     - delay: 2s
     - lambda: 'id(finger_status).publish_state("${txt_ready}");'
+    - script.execute: led_idle
 
   on_finger_scan_invalid:
     - lambda: 'id(finger_status).publish_state("${txt_scan_invalid}");'
-    - script.execute: led_warning
+    - fingerprint_grow.aura_led_control: {state: FLASHING, speed: 25, color: YELLOW, count: 3}
     - script.execute: beep_error
     - delay: 3s
     - lambda: 'id(finger_status).publish_state("${txt_ready}");'
+    - script.execute: led_idle
 
   # --- Anlern-Prozess ---
   on_enrollment_scan:
-    - script.execute: led_warning
+    - fingerprint_grow.aura_led_control: {state: FLASHING, speed: 25, color: GREEN, count: 1}
     - script.execute: beep_success
     - lambda: |-
         char buf[32];
@@ -215,6 +217,8 @@ fingerprint_grow:
         id(finger_status).publish_state("${txt_success}");
         std::string name = id(input_new_name).state;
         if (!name.empty()) {
+          std::replace(name.begin(), name.end(), '=', '_');
+          std::replace(name.begin(), name.end(), ';', '_');
           char buf[128];
           sprintf(buf, "%d=%s;", id(temp_enroll_id), name.c_str());
           id(finger_names_str) += buf;
@@ -274,6 +278,8 @@ pn532_spi:
               id(whitelist_str) += current_uid;
               std::string name = id(input_new_name).state;
               if (!name.empty()) {
+                std::replace(name.begin(), name.end(), '=', '_');
+                std::replace(name.begin(), name.end(), ';', '_');
                 char buf[128];
                 sprintf(buf, "%s=%s;", current_uid.c_str(), name.c_str());
                 id(nfc_names_str) += buf;
@@ -678,6 +684,7 @@ button:
     icon: "mdi:fingerprint"
     on_press:
       then:
+        - fingerprint_grow.aura_led_control: {state: ALWAYS_ON, color: PURPLE, speed: 0, count: 0}
         # Schritt A: ID berechnen und Text anzeigen
         - lambda: |-
             int next_id = 1;
@@ -693,7 +700,7 @@ button:
         # Schritt B:ESPHome-Action starten
         - fingerprint_grow.enroll:
             finger_id: !lambda "return id(temp_enroll_id);"
-            num_scans: 4
+            num_scans: 2
 
   - platform: template
     name: "Türklingel"
