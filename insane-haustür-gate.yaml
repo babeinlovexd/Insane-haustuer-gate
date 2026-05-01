@@ -79,11 +79,13 @@ globals:
     type: std::string
     restore_value: yes
     max_restore_data_length: 254
+    initial_value: '""'
 
   - id: nfc_names_str
     type: std::string
     restore_value: yes
     max_restore_data_length: 254
+    initial_value: '""'
 
 # ==============================================================================
 # NETZWERK & API
@@ -219,12 +221,9 @@ fingerprint_grow:
         if (!name.empty()) {
           std::replace(name.begin(), name.end(), '=', '_');
           std::replace(name.begin(), name.end(), ';', '_');
-          char buf[128];
-          sprintf(buf, "%d=%s;", id(temp_enroll_id), name.c_str());
-          id(finger_names_str) += buf;
+          id(finger_names_str) += std::to_string(id(temp_enroll_id)) + "=" + name + ";";
           id(input_new_name).publish_state("");
         }
-        id(r503).update(); // Hardware-Update triggern
     - delay: 3s
     - lambda: 'id(finger_status).publish_state("${txt_ready}");'
 
@@ -280,9 +279,7 @@ pn532_spi:
               if (!name.empty()) {
                 std::replace(name.begin(), name.end(), '=', '_');
                 std::replace(name.begin(), name.end(), ';', '_');
-                char buf[128];
-                sprintf(buf, "%s=%s;", current_uid.c_str(), name.c_str());
-                id(nfc_names_str) += buf;
+                id(nfc_names_str) += current_uid + "=" + name + ";";
                 id(input_new_name).publish_state("");
               }
               id(beep_success).execute();
