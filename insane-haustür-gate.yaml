@@ -168,27 +168,27 @@ fingerprint_grow:
         id(finger_status).publish_state("${txt_access_granted} (ID: " + to_string(finger_id) + ")");
         id(haustuerzugang).publish_state(true);
 
-        // Beide Strings zusammenfügen für die Suche:
-        std::string names = id(finger_names_str_1) + id(finger_names_str_2);
-
-        char search_buf[32];
-        sprintf(search_buf, "%d=", finger_id);
-        std::string search_str = search_buf;
-        size_t pos = names.find(search_str);
-
+        std::string search_str = std::to_string(finger_id) + "=";
         bool found = false;
-        while (pos != std::string::npos) {
-            if (pos == 0 || names[pos - 1] == ';') {
-                pos += search_str.length();
-                size_t end_pos = names.find(";", pos);
-                if (end_pos != std::string::npos) {
-                    std::string found_name = names.substr(pos, end_pos - pos);
-                    id(last_access_name).publish_state(found_name);
-                    found = true;
-                    break;
+
+        const std::string* string_array[] = {&id(finger_names_str_1), &id(finger_names_str_2)};
+
+        for (const std::string* names_ptr : string_array) {
+            const std::string& names = *names_ptr;
+            size_t pos = names.find(search_str);
+            while (pos != std::string::npos) {
+                if (pos == 0 || names[pos - 1] == ';') {
+                    pos += search_str.length();
+                    size_t end_pos = names.find(";", pos);
+                    if (end_pos != std::string::npos) {
+                        id(last_access_name).publish_state(names.substr(pos, end_pos - pos));
+                        found = true;
+                        break;
+                    }
                 }
+                pos = names.find(search_str, pos + 1);
             }
-            pos = names.find(search_str, pos + 1);
+            if (found) break;
         }
 
         if (!found) {
@@ -349,24 +349,27 @@ pn532_spi:
             ESP_LOGI("nfc_gate", "Zugriff gewährt: %s", current_uid.c_str());
             id(haustuerzugang).publish_state(true);
 
-            // Beide Strings für die Suche zusammenfügen:
-            std::string names = id(nfc_names_str_1) + id(nfc_names_str_2);
             std::string name_search = current_uid + "=";
-            size_t pos = names.find(name_search);
-
             bool found = false;
-            while (pos != std::string::npos) {
-                if (pos == 0 || names[pos - 1] == ';') {
-                    pos += name_search.length();
-                    size_t end_pos = names.find(";", pos);
-                    if (end_pos != std::string::npos) {
-                        std::string found_name = names.substr(pos, end_pos - pos);
-                        id(last_access_name).publish_state(found_name);
-                        found = true;
-                        break;
+
+            const std::string* string_array[] = {&id(nfc_names_str_1), &id(nfc_names_str_2)};
+
+            for (const std::string* names_ptr : string_array) {
+                const std::string& names = *names_ptr;
+                size_t pos = names.find(name_search);
+                while (pos != std::string::npos) {
+                    if (pos == 0 || names[pos - 1] == ';') {
+                        pos += name_search.length();
+                        size_t end_pos = names.find(";", pos);
+                        if (end_pos != std::string::npos) {
+                            id(last_access_name).publish_state(names.substr(pos, end_pos - pos));
+                            found = true;
+                            break;
+                        }
                     }
+                    pos = names.find(name_search, pos + 1);
                 }
-                pos = names.find(name_search, pos + 1);
+                if (found) break;
             }
 
             if (!found) {
