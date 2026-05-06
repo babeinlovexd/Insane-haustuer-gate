@@ -242,24 +242,8 @@ fingerprint_grow:
     - script.execute: beep_success
     - lambda: |-
         id(finger_status).publish_state("${txt_success}");
-        std::string name = id(input_new_name).state;
-        if (!name.empty()) {
-          std::replace(name.begin(), name.end(), '=', '_');
-          std::replace(name.begin(), name.end(), ';', '_');
-
-          std::string entry = std::to_string(id(temp_enroll_id)) + "=" + name + ";";
-
-          // Speichermanagement:
-          if (id(finger_names_str_1).length() + entry.length() <= 250) {
-            id(finger_names_str_1) += entry;
-          } else if (id(finger_names_str_2).length() + entry.length() <= 250) {
-            id(finger_names_str_2) += entry;
-          } else {
-            ESP_LOGE("finger", "Speicher voll!");
-          }
-
-          id(input_new_name).publish_state("");
-        }
+        id(save_name_to_db).execute(std::to_string(id(temp_enroll_id)), id(input_new_name).state, true);
+        id(input_new_name).publish_state("");
     - delay: 3s
     - lambda: 'id(finger_status).publish_state("${txt_ready}");'
 
@@ -311,23 +295,8 @@ pn532_spi:
             if (whitelist_padded.find(search_str) == std::string::npos) {
               if (!id(whitelist_str).empty()) id(whitelist_str) += ",";
               id(whitelist_str) += current_uid;
-              std::string name = id(input_new_name).state;
-              if (!name.empty()) {
-                std::replace(name.begin(), name.end(), '=', '_');
-                std::replace(name.begin(), name.end(), ';', '_');
-
-                std::string entry = current_uid + "=" + name + ";";
-
-                if (id(nfc_names_str_1).length() + entry.length() <= 250) {
-                  id(nfc_names_str_1) += entry;
-                } else if (id(nfc_names_str_2).length() + entry.length() <= 250) {
-                  id(nfc_names_str_2) += entry;
-                } else {
-                  ESP_LOGE("nfc", "Speicher voll!");
-                }
-
-                id(input_new_name).publish_state("");
-              }
+              id(save_name_to_db).execute(current_uid, id(input_new_name).state, false);
+              id(input_new_name).publish_state("");
               id(beep_success).execute();
               id(led_party).execute();
               id(whitelist_display).update();
@@ -599,6 +568,41 @@ switch:
 # SKRIPTE & EFFEKTE
 # ==============================================================================
 script:
+  # --- Gemeinsame Logik für Namensspeicherung ---
+  - id: save_name_to_db
+    parameters:
+      id_str: std::string
+      name: std::string
+      is_finger: bool
+    then:
+      - lambda: |-
+          if (name.empty()) return;
+          std::replace(name.begin(), name.end(), '=', '_');
+          std::replace(name.begin(), name.end(), ';', '_');
+
+          std::string entry = id_str + "=" + name + ";";
+
+          std::string *db1, *db2;
+          const char* log_tag;
+
+          if (is_finger) {
+            db1 = &id(finger_names_str_1);
+            db2 = &id(finger_names_str_2);
+            log_tag = "finger";
+          } else {
+            db1 = &id(nfc_names_str_1);
+            db2 = &id(nfc_names_str_2);
+            log_tag = "nfc";
+          }
+
+          if (db1->length() + entry.length() <= 250) {
+            *db1 += entry;
+          } else if (db2->length() + entry.length() <= 250) {
+            *db2 += entry;
+          } else {
+            ESP_LOGE(log_tag, "Speicher voll!");
+          }
+
   # --- Klingel Effekt (Blaues Atmen) ---
   - id: led_doorbell_effect
     then:
