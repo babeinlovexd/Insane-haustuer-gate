@@ -48,6 +48,11 @@ external_components:
       url: https://github.com/babeinlovexd/insane_package_report
     components: [ insane_package_report ]
     refresh: 1s
+  - source:
+      type: git
+      url: https://github.com/babeinlovexd/Insane-haustuer-gate
+      ref: feature/fingerprint-security-level
+    components: [ fingerprint_grow ]
 
 insane_package_report:
 
@@ -738,6 +743,21 @@ number:
     step: 1
     restore_value: yes
     initial_value: 0
+
+  - platform: template
+    name: "Fingerprint Security Level"
+    entity_category: config
+    id: r503_security_level
+    optimistic: true
+    min_value: 1
+    max_value: 5
+    step: 1
+    restore_value: yes
+    initial_value: 3
+    on_value:
+      - fingerprint_grow.set_security_level:
+          id: r503
+          level: !lambda 'return x;'
 
 button:
   - platform: template
