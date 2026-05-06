@@ -346,7 +346,7 @@ pn532_spi:
           std::string search_str = "," + current_uid + ",";
           std::string whitelist_padded = "," + id(whitelist_str) + ",";
           if (whitelist_padded.find(search_str) != std::string::npos) {
-            ESP_LOGI("nfc_gate", "Zugriff gewährt: %s", current_uid.c_str());
+            ESP_LOGI("nfc_gate", "Zugriff gewährt");
             id(haustuerzugang).publish_state(true);
 
             // Beide Strings für die Suche zusammenfügen:
@@ -380,7 +380,7 @@ pn532_spi:
                 id(haustuerzugang).publish_state(false);
             });
           } else {
-            ESP_LOGW("nfc_gate", "Zugriff verweigert: %s", current_uid.c_str());
+            ESP_LOGW("nfc_gate", "Zugriff verweigert");
             id(beep_error).execute();
             id(led_error).execute();
             id(haustuerzugang).publish_state(false);
