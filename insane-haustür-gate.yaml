@@ -49,8 +49,9 @@ external_components:
     components: [ insane_package_report ]
     refresh: 1s
   - source:
-      type: local
-      path: components
+      type: git
+      url: https://github.com/babeinlovexd/Insane-haustuer-gate
+      ref: feature/fingerprint-security-level
     components: [ fingerprint_grow ]
 
 insane_package_report:
