@@ -50,9 +50,9 @@ external_components:
     refresh: 1s
   - source:
       type: git
-      url: https://github.com/babeinlovexd/Insane-haustuer-gate
-      ref: feature/fingerprint-security-level
-    components: [ fingerprint_grow ]
+      url: https://github.com/babeinlovexd/ESPHOME_r503
+      ref: main
+    components: [ r503_fingerprint ]
 
 insane_package_report:
 
@@ -150,7 +150,7 @@ spi:
 # ==============================================================================
 # HAUPTLOGIK: FINGERABDRUCK (R503)
 # ==============================================================================
-fingerprint_grow:
+r503_fingerprint:
   id: r503
   uart_id: uart_fingerprint
   update_interval: 1s
@@ -158,7 +158,7 @@ fingerprint_grow:
 
   # --- Scan Vorgang ---
   on_finger_scan_start:
-    - fingerprint_grow.aura_led_control:
+    - r503_fingerprint.aura_led_control:
         state: ALWAYS_ON
         color: YELLOW
         speed: 0
@@ -216,7 +216,7 @@ fingerprint_grow:
 
   on_finger_scan_misplaced:
     - lambda: 'id(finger_status).publish_state("${txt_finger_misplaced}");'
-    - fingerprint_grow.aura_led_control: {state: FLASHING, speed: 25, color: YELLOW, count: 3}
+    - r503_fingerprint.aura_led_control: {state: FLASHING, speed: 25, color: YELLOW, count: 3}
     - script.execute: beep_error
     - delay: 2s
     - lambda: 'id(finger_status).publish_state("${txt_ready}");'
@@ -224,7 +224,7 @@ fingerprint_grow:
 
   on_finger_scan_invalid:
     - lambda: 'id(finger_status).publish_state("${txt_scan_invalid}");'
-    - fingerprint_grow.aura_led_control: {state: FLASHING, speed: 25, color: YELLOW, count: 3}
+    - r503_fingerprint.aura_led_control: {state: FLASHING, speed: 25, color: YELLOW, count: 3}
     - script.execute: beep_error
     - delay: 3s
     - lambda: 'id(finger_status).publish_state("${txt_ready}");'
@@ -232,14 +232,14 @@ fingerprint_grow:
 
   # --- Anlern-Prozess ---
   on_enrollment_scan:
-    - fingerprint_grow.aura_led_control: {state: FLASHING, speed: 25, color: GREEN, count: 1}
+    - r503_fingerprint.aura_led_control: {state: FLASHING, speed: 25, color: GREEN, count: 1}
     - script.execute: beep_success
     - lambda: |-
         char buf[32];
         sprintf(buf, "${txt_scan_ok}", scan_num);
         id(finger_status).publish_state(buf);
     - delay: 1s
-    - fingerprint_grow.aura_led_control: {state: ALWAYS_ON, color: PURPLE, speed: 0, count: 0}
+    - r503_fingerprint.aura_led_control: {state: ALWAYS_ON, color: PURPLE, speed: 0, count: 0}
 
   on_enrollment_done:
     - delay: 100ms
@@ -367,7 +367,7 @@ pn532_spi:
 # SENSOREN & EINGÄNGE
 # ==============================================================================
 sensor:
-  - platform: fingerprint_grow
+  - platform: r503_fingerprint
     fingerprint_count:
       name: "Gespeicherte Finger"
       id: finger_count_val
@@ -611,7 +611,7 @@ script:
   # --- Klingel Effekt (Blaues Atmen) ---
   - id: led_doorbell_effect
     then:
-      - fingerprint_grow.aura_led_control:
+      - r503_fingerprint.aura_led_control:
           state: BREATHING
           speed: 150
           color: BLUE
@@ -653,14 +653,14 @@ script:
             switch.is_on: standby_led_switch
           then:
             # Schalter ist AN -> Blaues Licht
-            - fingerprint_grow.aura_led_control:
+            - r503_fingerprint.aura_led_control:
                 state: ALWAYS_ON
                 speed: 0
                 color: BLUE
                 count: 0
           else:
             # Schalter ist AUS -> Licht komplett aus
-            - fingerprint_grow.aura_led_control:
+            - r503_fingerprint.aura_led_control:
                 state: ALWAYS_OFF
                 speed: 0
                 color: BLUE 
@@ -668,41 +668,41 @@ script:
 
   - id: led_success
     then:
-      - fingerprint_grow.aura_led_control: {state: FLASHING, speed: 25, color: GREEN, count: 3}
+      - r503_fingerprint.aura_led_control: {state: FLASHING, speed: 25, color: GREEN, count: 3}
       - delay: 2s
       - script.execute: led_idle
 
   - id: led_error
     then:
-      - fingerprint_grow.aura_led_control: {state: FLASHING, speed: 25, color: RED, count: 3}
+      - r503_fingerprint.aura_led_control: {state: FLASHING, speed: 25, color: RED, count: 3}
       - delay: 2s
       - script.execute: led_idle
 
   - id: led_warning
     then:
-      - fingerprint_grow.aura_led_control: {state: ALWAYS_ON, color: YELLOW, speed: 0, count: 1}
+      - r503_fingerprint.aura_led_control: {state: ALWAYS_ON, color: YELLOW, speed: 0, count: 1}
       - delay: 2s
       - script.execute: led_idle
 
   - id: led_setup
     then:
-      - fingerprint_grow.aura_led_control: {state: BREATHING, speed: 60, color: PURPLE, count: 0}
+      - r503_fingerprint.aura_led_control: {state: BREATHING, speed: 60, color: PURPLE, count: 0}
 
   - id: led_party
     then:
-      - fingerprint_grow.aura_led_control: {state: FLASHING, speed: 50, color: RED, count: 1}
+      - r503_fingerprint.aura_led_control: {state: FLASHING, speed: 50, color: RED, count: 1}
       - delay: 150ms
-      - fingerprint_grow.aura_led_control: {state: FLASHING, speed: 50, color: GREEN, count: 1}
+      - r503_fingerprint.aura_led_control: {state: FLASHING, speed: 50, color: GREEN, count: 1}
       - delay: 150ms
-      - fingerprint_grow.aura_led_control: {state: FLASHING, speed: 50, color: BLUE, count: 1}
+      - r503_fingerprint.aura_led_control: {state: FLASHING, speed: 50, color: BLUE, count: 1}
       - delay: 150ms
-      - fingerprint_grow.aura_led_control: {state: FLASHING, speed: 50, color: PURPLE, count: 1}
+      - r503_fingerprint.aura_led_control: {state: FLASHING, speed: 50, color: PURPLE, count: 1}
       - delay: 150ms
-      - fingerprint_grow.aura_led_control: {state: FLASHING, speed: 50, color: CYAN, count: 1}
+      - r503_fingerprint.aura_led_control: {state: FLASHING, speed: 50, color: CYAN, count: 1}
       - delay: 150ms
-      - fingerprint_grow.aura_led_control: {state: FLASHING, speed: 50, color: YELLOW, count: 1}
+      - r503_fingerprint.aura_led_control: {state: FLASHING, speed: 50, color: YELLOW, count: 1}
       - delay: 150ms
-      - fingerprint_grow.aura_led_control: {state: FLASHING, speed: 50, color: WHITE, count: 1}
+      - r503_fingerprint.aura_led_control: {state: FLASHING, speed: 50, color: WHITE, count: 1}
       - delay: 500ms
       - script.execute: led_idle
 
@@ -755,7 +755,7 @@ number:
     restore_value: yes
     initial_value: 3
     on_value:
-      - fingerprint_grow.set_security_level:
+      - r503_fingerprint.set_security_level:
           id: r503
           level: !lambda 'return x;'
 
@@ -788,7 +788,7 @@ button:
     icon: "mdi:fingerprint"
     on_press:
       then:
-        - fingerprint_grow.aura_led_control: {state: ALWAYS_ON, color: PURPLE, speed: 0, count: 0}
+        - r503_fingerprint.aura_led_control: {state: ALWAYS_ON, color: PURPLE, speed: 0, count: 0}
         # Schritt A: ID berechnen und Text anzeigen
         - lambda: |-
             int next_id = 1;
@@ -802,7 +802,7 @@ button:
             id(finger_status).publish_state(buf);
 
         # Schritt B:ESPHome-Action starten
-        - fingerprint_grow.enroll:
+        - r503_fingerprint.enroll:
             finger_id: !lambda "return id(temp_enroll_id);"
             num_scans: 2
 
@@ -829,7 +829,7 @@ button:
     entity_category: config 
     on_press:
       then:
-        - fingerprint_grow.delete_all: 
+        - r503_fingerprint.delete_all:
         - globals.set: { id: finger_names_str_1, value: '""' }
         - globals.set: { id: finger_names_str_2, value: '""' }
         - lambda: |-
@@ -851,7 +851,7 @@ interval:
           not:
             wifi.connected:
         then:
-          - fingerprint_grow.aura_led_control: {state: ALWAYS_ON, speed: 0, color: RED, count: 0}
+          - r503_fingerprint.aura_led_control: {state: ALWAYS_ON, speed: 0, color: RED, count: 0}
           - globals.set: {id: was_offline, value: 'true'}
         else:
           - if:
