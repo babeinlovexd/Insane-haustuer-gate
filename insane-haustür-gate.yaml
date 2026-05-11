@@ -172,33 +172,7 @@ r503_fingerprint:
     - lambda: |-
         id(finger_status).publish_state("${txt_access_granted} (ID: " + to_string(finger_id) + ")");
         id(haustuerzugang).publish_state(true);
-
-        std::string search_str = std::to_string(finger_id) + "=";
-        bool found = false;
-
-        const std::string* string_array[] = {&id(finger_names_str_1), &id(finger_names_str_2)};
-
-        for (const std::string* names_ptr : string_array) {
-            const std::string& names = *names_ptr;
-            size_t pos = names.find(search_str);
-            while (pos != std::string::npos) {
-                if (pos == 0 || names[pos - 1] == ';') {
-                    pos += search_str.length();
-                    size_t end_pos = names.find(";", pos);
-                    if (end_pos != std::string::npos) {
-                        id(last_access_name).publish_state(names.substr(pos, end_pos - pos));
-                        found = true;
-                        break;
-                    }
-                }
-                pos = names.find(search_str, pos + 1);
-            }
-            if (found) break;
-        }
-
-        if (!found) {
-            id(last_access_name).publish_state("${txt_unknown_name}");
-        }
+        id(lookup_name_in_db).execute(std::to_string(finger_id), true);
     - script.execute: led_success
     - script.execute: beep_done
     - delay: 2s
@@ -333,33 +307,7 @@ pn532_spi:
           if (is_in_whitelist(current_uid)) {
             ESP_LOGI("nfc_gate", "Zugriff gewährt");
             id(haustuerzugang).publish_state(true);
-
-            std::string name_search = current_uid + "=";
-            bool found = false;
-
-            const std::string* string_array[] = {&id(nfc_names_str_1), &id(nfc_names_str_2)};
-
-            for (const std::string* names_ptr : string_array) {
-                const std::string& names = *names_ptr;
-                size_t pos = names.find(name_search);
-                while (pos != std::string::npos) {
-                    if (pos == 0 || names[pos - 1] == ';') {
-                        pos += name_search.length();
-                        size_t end_pos = names.find(";", pos);
-                        if (end_pos != std::string::npos) {
-                            id(last_access_name).publish_state(names.substr(pos, end_pos - pos));
-                            found = true;
-                            break;
-                        }
-                    }
-                    pos = names.find(name_search, pos + 1);
-                }
-                if (found) break;
-            }
-
-            if (!found) {
-                id(last_access_name).publish_state("${txt_unknown_name}");
-            }
+            id(lookup_name_in_db).execute(current_uid, false);
 
             id(beep_success).execute();
             id(led_success).execute();
@@ -584,6 +532,49 @@ switch:
 # SKRIPTE & EFFEKTE
 # ==============================================================================
 script:
+  # --- Gemeinsame Logik für Namenssuche ---
+  - id: lookup_name_in_db
+    parameters:
+      id_str: std::string
+      is_finger: bool
+    then:
+      - lambda: |-
+          std::string search_str = id_str + "=";
+          bool found = false;
+          const std::string *db1, *db2;
+
+          if (is_finger) {
+            db1 = &id(finger_names_str_1);
+            db2 = &id(finger_names_str_2);
+          } else {
+            db1 = &id(nfc_names_str_1);
+            db2 = &id(nfc_names_str_2);
+          }
+
+          const std::string* string_array[] = {db1, db2};
+
+          for (const std::string* names_ptr : string_array) {
+              const std::string& names = *names_ptr;
+              size_t pos = names.find(search_str);
+              while (pos != std::string::npos) {
+                  if (pos == 0 || names[pos - 1] == ';') {
+                      pos += search_str.length();
+                      size_t end_pos = names.find(";", pos);
+                      if (end_pos != std::string::npos) {
+                          id(last_access_name).publish_state(names.substr(pos, end_pos - pos));
+                          found = true;
+                          break;
+                      }
+                  }
+                  pos = names.find(search_str, pos + 1);
+              }
+              if (found) break;
+          }
+
+          if (!found) {
+              id(last_access_name).publish_state("${txt_unknown_name}");
+          }
+
   # --- Gemeinsame Logik für Namensspeicherung ---
   - id: save_name_to_db
     parameters:
