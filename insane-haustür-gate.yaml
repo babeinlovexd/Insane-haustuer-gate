@@ -270,12 +270,27 @@ pn532_spi:
       - lambda: |-
           // UID lesen
           std::string current_uid = "";
+          current_uid.reserve(20);
           for (size_t i = 0; i < tag.get_uid().size(); i++) {
               char buf[3];
-              sprintf(buf, "%02X", tag.get_uid()[i]);
+              snprintf(buf, sizeof(buf), "%02X", tag.get_uid()[i]);
               current_uid += buf;
               if (i < tag.get_uid().size() - 1) current_uid += "-";
           }
+
+          // Helfer-Lambda zur effizienten Prüfung der Whitelist (vermeidet String-Kopien)
+          auto is_in_whitelist = [&](const std::string& uid) -> bool {
+            const std::string& whitelist = id(whitelist_str);
+            if (whitelist.empty()) return false;
+            size_t pos = whitelist.find(uid);
+            while (pos != std::string::npos) {
+              bool match_start = (pos == 0 || whitelist[pos - 1] == ',');
+              bool match_end = (pos + uid.length() == whitelist.length() || whitelist[pos + uid.length()] == ',');
+              if (match_start && match_end) return true;
+              pos = whitelist.find(uid, pos + 1);
+            }
+            return false;
+          };
           
           // Master-Karte Check
           if (current_uid == id(master_tag_uid)) {
@@ -295,9 +310,7 @@ pn532_spi:
 
           // Lernmodus: Neue Karte speichern
           if (id(learn_mode)) {
-            std::string search_str = "," + current_uid + ",";
-            std::string whitelist_padded = "," + id(whitelist_str) + ",";
-            if (whitelist_padded.find(search_str) == std::string::npos) {
+            if (!is_in_whitelist(current_uid)) {
               if (!id(whitelist_str).empty()) id(whitelist_str) += ",";
               id(whitelist_str) += current_uid;
               id(save_name_to_db).execute(current_uid, id(input_new_name).state, false);
@@ -317,9 +330,7 @@ pn532_spi:
           }
 
           // Normalbetrieb: Zugangsprüfung
-          std::string search_str = "," + current_uid + ",";
-          std::string whitelist_padded = "," + id(whitelist_str) + ",";
-          if (whitelist_padded.find(search_str) != std::string::npos) {
+          if (is_in_whitelist(current_uid)) {
             ESP_LOGI("nfc_gate", "Zugriff gewährt");
             id(haustuerzugang).publish_state(true);
 
