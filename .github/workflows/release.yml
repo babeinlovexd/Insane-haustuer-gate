@@ -38,7 +38,7 @@ jobs:
         python-version: '3.12'
     - run: python -m pip install esphome==2026.10.2
     - name: Compile with CI placeholders
-      run: python ci/esphome_check.py "insane-haustÃ¼r-gate.yaml"
+      run: python ci/esphome_check.py "insane-haustür-gate.yaml"
   release:
     if: startsWith(github.ref, 'refs/tags/v')
     needs:
